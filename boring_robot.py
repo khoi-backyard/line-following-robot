@@ -1,6 +1,6 @@
 from signal import pause
 
-from gpiozero import Robot
+from gpiozero import Robot, DistanceSensor
 from bd import BlueDot
 
 from libs import BoringTapeSensor
@@ -36,8 +36,12 @@ def line_following_engine():
     while True:
         state = (most_left_sensor.line_detected, left_sensor.line_detected,
                  mid_sensor.line_detected, right_sensor.line_detected, most_right_sensor.line_detected)
-        print(f"state {state}")
-        if state == (False, False, True, False, False):
+        distance_in_cm = distance_sensor.distance * 100
+        print(f"state {state} distance {distance_in_cm}")
+        if distance_in_cm < 15:
+            print("about to hit something")
+            action = (0, 0)
+        elif state == (False, False, True, False, False):
             print("Going straight")
             action = (1 * SPEED, 1 * SPEED)
         elif state == (False, False, True, True, False):
@@ -71,6 +75,8 @@ right_sensor = BoringTapeSensor(17)
 most_right_sensor = BoringTapeSensor(23)  # most right
 most_left_sensor = BoringTapeSensor(4)  # most left
 
+distance_sensor = DistanceSensor(echo=9, trigger=10)
+
 robot = Robot(left=(13, 19), right=(12, 18))
 bd = BlueDot()
 
@@ -91,6 +97,6 @@ def use_autonomous_engine():
 bd.when_manual_pressed = use_manual_control_engine
 bd.when_auto_pressed = use_autonomous_engine
 
-use_manual_control_engine()  # Start out by using the manual control
+use_autonomous_engine()  # Start out by using the manual control
 
 pause()
