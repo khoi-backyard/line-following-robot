@@ -57,6 +57,7 @@ class MrBit_QTR_5RC:
         """ Params: values - a list of sensor values to print
             Prints out the sensor and it's current recorded reading.
         """
+
         for i in range(0, self.NUM_SENSORS):
             print("sensor %d, reading %d" % (i, values[i]))
 
@@ -121,7 +122,7 @@ class MrBit_QTR_5RC:
 
         self.read_sensors()
 
-        print("uncalibrated readings")
+        # print("uncalibrated readings")
         self.print_sensor_values(self.sensorValues)
 
         for i in range(0, self.NUM_SENSORS):
@@ -136,7 +137,7 @@ class MrBit_QTR_5RC:
                 val = 1000
             self.sensorValues[i] = val
 
-        print("calibrated readings")
+        # print("calibrated readings")
         self.print_sensor_values(self.sensorValues)
 
     def read_sensors(self):
