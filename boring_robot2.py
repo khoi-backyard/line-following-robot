@@ -3,6 +3,7 @@ import numpy as np
 import wiringpi as wp
 
 # Class Robot.
+from HCSR04 import HCSR04
 from QTR5RC import QTR5RC
 
 low_yellow = np.array([22, 100, 20], np.uint8)
@@ -14,6 +15,7 @@ high_green = np.array([80, 255, 255], np.uint8)
 low_blue = np.array([100, 100, 20], np.uint8)
 high_blue = np.array([140, 255, 255], np.uint8)
 
+
 def clamped(v, minimum, maximum):
     return max(minimum, min(maximum, v))
 
@@ -23,9 +25,24 @@ def pos_to_values(x, y):
     r = y if x < 0 else y - x
     return clamped(l, -1, 1), clamped(r, -1, 1)
 
+def all_satisfy(arr, f):
+    for v in arr:
+        if not f(v):
+            return False
+    return True
 
 class Robot:
-    def __init__(self, left_motor_pins, right_motor_pins, line_sensors, base_speed, max_speed, Kp, Kd):
+    def __init__(self,
+                 left_motor_pins,
+                 right_motor_pins,
+                 line_sensors,
+                 sonic_sensor,
+                 avoidance_distance,
+                 base_speed,
+                 max_speed,
+                 Kp,
+                 Kd,
+                 ):
         self.left_motor_pins = left_motor_pins
         self.right_motor_pins = right_motor_pins
         self.Kp = Kp
@@ -35,6 +52,10 @@ class Robot:
         self.qtr = QTR5RC(line_sensors)
         self.qtr.initialise_calibration()
         self.last_error = 0
+        self.sonic_sensor = sonic_sensor
+        self.avoidance_distance = avoidance_distance
+
+        print(f"kp {Kp} kd {Kd} base {base_speed} max {max_speed} distance {avoidance_distance}")
 
         wp.wiringPiSetup()
 
@@ -56,7 +77,16 @@ class Robot:
         print("calibrating done")
 
     def go(self):
+        if self.sonic_sensor.distance() <= self.avoidance_distance:
+            self.stop()
+            return
+
         position = self.qtr.read_line()
+
+        if all_satisfy(self.qtr.sensorValues, lambda v: v >= 1000):
+            self.stop()
+            return
+
         print(f"position {position}")
         error = position - 2000
         motor_speed = self.Kp * error + self.Kd * (error - self.last_error)
@@ -121,22 +151,18 @@ class Robot:
                     area = cv2.contourArea(contour)
                     if area > 300:
                         print(f"{color_key} {len(contours)}")
-                # for pic, contour in enumerate(contours):
-                #     area = cv2.contourArea(contour)
-                #     print(area)
-
 
 
 if __name__ == "__main__":
-    # error = position - 2000
-    # motor_speed = self.Kp * error + self.Kd * (error - self.last_error)
-    # self.last_error = error
-    kp = 0.2
-    kd = 10
-
-    print(f"running kp {kp} kd {kd}")
-    r = Robot(left_motor_pins=(23, 24), right_motor_pins=(
-        26, 1), line_sensors=[7, 3, 2, 0, 4], base_speed=20, max_speed=30, Kp=kp, Kd=kd)
+    r = Robot(left_motor_pins=(23, 24),
+              right_motor_pins=(26, 1),
+              line_sensors=[7, 3, 2, 0, 4],
+              sonic_sensor=HCSR04(echo_pin=13, trigger_pin=12),
+              avoidance_distance=15,
+              base_speed=20,
+              max_speed=40,
+              Kp=0.2,
+              Kd=10)
 
     r.stop()
     r.calibrate()

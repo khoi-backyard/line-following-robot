@@ -30,7 +30,6 @@ class HCSR04:
         while wp.digitalRead(self.echo_pin) == 1:
             pulse_end_time = time.time()
 
-
         pulse_duration = pulse_end_time - pulse_start_time
         distance = round(pulse_duration * 17150, 2)
         self.last_read_time = time.time()
