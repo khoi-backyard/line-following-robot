@@ -1,11 +1,12 @@
 import RPi.GPIO as GPIO
 import time
 
-try:
-      GPIO.setmode(GPIO.BOARD)
 
-      PIN_TRIGGER = 7
-      PIN_ECHO = 11
+try:
+      GPIO.setmode(GPIO.BCM)
+
+      PIN_TRIGGER = 10
+      PIN_ECHO = 9
 
       GPIO.setup(PIN_TRIGGER, GPIO.OUT)
       GPIO.setup(PIN_ECHO, GPIO.IN)

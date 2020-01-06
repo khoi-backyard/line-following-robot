@@ -1,8 +1,6 @@
-import wiringpi as wp
-from time import sleep
-from bd import BlueDot
 import cv2
 import numpy as np
+import wiringpi as wp
 
 # Class Robot.
 from QTR5RC import QTR5RC
