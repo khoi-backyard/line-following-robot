@@ -1,20 +1,58 @@
+#   Python QTR-8RC sensor library
+#   Atuhor: Tom Broughton (@dpolymath)
+#   Date: 20/03/2017
+#
+#   Reads the Pololu QTR-8RC IR sensor array
+#   https://www.pololu.com/docs/pdf/0J12/QTR-8x.pdf
+#
+#   Hardware setup (changing pins can be managed in init):
+#   LEDON pin connected to GPIO 21
+#   3V3 to Pi GPIO rail and GND (bypass soldered on qtr-8rc for 3V3 option)
+#   Pins 22 - 29 to each IR LED/phototransitor pair
+#    - This version does not work with PWM for LEDON_PIN
+#
+# #############################################################################
+#   MIT License
+#
+#   Copyright (c) 2017 Tom Broughton 
+#
+#   Permission is hereby granted, free vof charge, to any person obtaining a copy
+#   of this software and associated documentation files (the "Software"), to deal
+#   in the Software without restriction, including without limitation the rights
+#   to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+#   copies of the Software, and to permit persons to whom the Software is
+#   furnished to do so, subject to the following conditions:
+#
+#   The above copyright notice and this permission notice shall be included in all
+#   copies or substantial portions of the Software.
+#
+#   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+#   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+#   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+#   AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+#   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+#   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+#   SOFTWARE.
+###############################################################################
+
 import wiringpi as wp
 
 
-class MrBit_QTR_5RC:
+class QTR5RC:
     """ Class for reading values from Pololu QT8-8RC sensor array.
         Requires wiringpi https://github.com/WiringPi/WiringPi-Python
     """
 
-    def __init__(self, pins):
+    def __init__(self, sensor_pins=None):
         """ Initialises class constants and variables - pins defined here.
         """
 
         self.wp = wp
         self.wp.wiringPiSetup()
 
-        self.LEDON_PIN = 28
-        self.SENSOR_PINS = pins
+        self.LEDON_PIN = 29
+        self.SENSOR_PINS = sensor_pins
+
         self.NUM_SENSORS = len(self.SENSOR_PINS)
         self.CHARGE_TIME = 10  # us to charge the capacitors
         self.READING_TIMEOUT = 1000  # us, assume reading is black
@@ -29,7 +67,6 @@ class MrBit_QTR_5RC:
         """ Sets up the GPIO pins and also ensures the correct number of items
             in sensors values and calibration lists to store readings.
         """
-        self.wp.wiringPiSetup()
         for pin in self.SENSOR_PINS:
             self.sensorValues.append(0)
             self.calibratedMax.append(0)
@@ -57,7 +94,6 @@ class MrBit_QTR_5RC:
         """ Params: values - a list of sensor values to print
             Prints out the sensor and it's current recorded reading.
         """
-
         for i in range(0, self.NUM_SENSORS):
             print("sensor %d, reading %d" % (i, values[i]))
 
@@ -100,20 +136,19 @@ class MrBit_QTR_5RC:
 
         for i in range(0, self.NUM_SENSORS):
             val = self.sensorValues[i]
-            if val > 500:
-                online = True
+            if val > 500: online = True
             if val > 50:
                 multiplier = i * 1000
                 avg += val * multiplier
                 summ += val
 
         if online == False:
-            if self.lastValue < (self.NUM_SENSORS-1)*1000/2:
+            if self.lastValue < (self.NUM_SENSORS - 1) * 1000 / 2:
                 return 0
             else:
-                return (self.NUM_SENSORS-1)*1000
+                return (self.NUM_SENSORS - 1) * 1000
 
-        self.lastValue = avg/summ
+        self.lastValue = avg / summ
         return self.lastValue
 
     def read_calibrated(self):
@@ -123,14 +158,13 @@ class MrBit_QTR_5RC:
         self.read_sensors()
 
         # print("uncalibrated readings")
-        self.print_sensor_values(self.sensorValues)
+        # self.print_sensor_values(self.sensor_calibrated_values)
 
         for i in range(0, self.NUM_SENSORS):
             denominator = self.calibratedMax[i] - self.calibratedMin[i]
             val = 0
             if denominator != 0:
-                val = (self.sensorValues[i] -
-                       self.calibratedMin[i]) * 1000 / denominator
+                val = (self.sensorValues[i] - self.calibratedMin[i]) * 1000 / denominator
             if val < 0:
                 val = 0
             elif val > 1000:
@@ -138,7 +172,7 @@ class MrBit_QTR_5RC:
             self.sensorValues[i] = val
 
         # print("calibrated readings")
-        self.print_sensor_values(self.sensorValues)
+        # self.print_sensor_values(self.sensor_calibrated_values)
 
     def read_sensors(self):
         """ Follows the Pololu guidance for reading capacitor discharge/sensors:
@@ -161,8 +195,8 @@ class MrBit_QTR_5RC:
         for sensorPin in self.SENSOR_PINS:
             self.wp.pinMode(sensorPin, self.wp.INPUT)
             # important: ensure pins are pulled down
-            self.wp.pullUpDnControl(sensorPin, 2)
-            #self.wp.digitalWrite(sensorPin, self.wp.HIGH)
+            self.wp.pullUpDnControl(sensorPin, self.wp.PUD_UP)
+            # self.wp.digitalWrite(sensorPin, self.wp.LOW)
 
         startTime = self.wp.micros()
         while self.wp.micros() - startTime < self.READING_TIMEOUT:
@@ -170,3 +204,49 @@ class MrBit_QTR_5RC:
             for i in range(0, self.NUM_SENSORS):
                 if self.wp.digitalRead(self.SENSOR_PINS[i]) == 0 and time < self.sensorValues[i]:
                     self.sensorValues[i] = time
+
+
+
+# Example ussage:
+if __name__ == "__main__":
+
+    PRINT_EVERY = 20
+    print_counter = 0
+
+    try:
+        qtr = QTR5RC(sensor_pins=[7, 3, 2, 0, 4])
+
+        approveCal = False
+        while not approveCal:
+            print("calibrating")
+            qtr.initialise_calibration()
+            qtr.emitters_on()
+            for i in range(0, 250):
+                qtr.calibrate_sensors()
+                wp.delay(20)
+            qtr.emitters_off()
+
+            print("calibration complete")
+            print("max vals")
+            qtr.print_sensor_values(qtr.calibratedMax)
+            print("calibration complete")
+            print("min vals")
+            qtr.print_sensor_values(qtr.calibratedMin)
+            approved = input("happy with calibrtion (Y/n)? ")
+            if approved == "Y" or approved == "y": approveCal = True
+    except Exception as e:
+        qtr.emitters_off()
+
+    try:
+        while 1:
+            qtr.emitters_on()
+            print(qtr.read_line())
+            qtr.emitters_off()
+            wp.delay(200)
+            # print_counter += 1
+
+    except KeyboardInterrupt:
+        qtr.emitters_off()
+
+    except Exception as e:
+        print(str(e))
