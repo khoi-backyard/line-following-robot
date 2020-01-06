@@ -68,10 +68,10 @@ class Robot:
         left_speed = clamped(self.base_speed + motor_speed, 0, self.Speed)
         print(f"left {left_speed} right {right_speed}")
 
-        # wp.softPwmWrite(self.left_motor_pins[0], left_speed)
-        # wp.softPwmWrite(self.left_motor_pins[1], 0)
-        # wp.softPwmWrite(self.right_motor_pins[0], right_speed)
-        # wp.softPwmWrite(self.left_motor_pins[1], 0)
+        wp.softPwmWrite(self.left_motor_pins[0], int(left_speed))
+        wp.softPwmWrite(self.left_motor_pins[1], 0)
+        wp.softPwmWrite(self.right_motor_pins[0], int(right_speed))
+        wp.softPwmWrite(self.left_motor_pins[1], 0)
 
     def stop(self):
         wp.softPwmWrite(self.right_motor_pins[1], 0)
@@ -130,22 +130,23 @@ class Robot:
 
 
 if __name__ == "__main__":
-    # (Speed, Kp, Ki, Kd)
+    # error = position - 2000
+    # motor_speed = self.Kp * error + self.Kd * (error - self.last_error)
+    # self.last_error = error
+    kp = 0.2
+    kd = 10
+
+    print(f"running kp {kp} kd {kd}")
     r = Robot(left_motor_pins=(23, 24), right_motor_pins=(
-        26, 1), line_sensors=[7, 3, 2, 0, 4], base_speed=40, max_speed=80, Kp=0.1, Kd=2)
+        26, 1), line_sensors=[7, 3, 2, 0, 4], base_speed=20, max_speed=30, Kp=kp, Kd=kd)
 
-    # r.calibrate()
-    bd = BlueDot()
-    r.detect_color()
+    r.stop()
+    r.calibrate()
+    # bd = BlueDot()
+    # r.detect_color()
 
-    # while True:
-    #     if bd.is_pressed:
-    #         x, y = bd.position.x, bd.position.y
-    #         left, right = pos_to_values(x, y)
-    #         r.drive(left, right)
-    #     else:
-    #         r.stop()
-        # try:
-        #     r.go()
-        # except Exception:
-        #     r.stop()
+    while True:
+        try:
+            r.go()
+        except KeyboardInterrupt:
+            r.stop()
