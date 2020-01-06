@@ -150,6 +150,7 @@ class Robot:
 
 
 if __name__ == "__main__":
+    bd = BlueDot()
     r = Robot(left_motor_pins=(23, 24),
               right_motor_pins=(26, 1),
               line_sensors=[7, 3, 2, 0, 4],
@@ -163,7 +164,6 @@ if __name__ == "__main__":
 
     r.stop()
     r.calibrate()
-    bd = BlueDot()
     # r.detect_color()
 
     while True:
