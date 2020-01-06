@@ -5,6 +5,7 @@ import wiringpi as wp
 # Class Robot.
 from HCSR04 import HCSR04
 from QTR5RC import QTR5RC
+from bd import BlueDot
 
 low_yellow = np.array([22, 100, 20], np.uint8)
 high_yellow = np.array([40, 255, 255], np.uint8)
@@ -25,11 +26,6 @@ def pos_to_values(x, y):
     r = y if x < 0 else y - x
     return clamped(l, -1, 1), clamped(r, -1, 1)
 
-def all_satisfy(arr, f):
-    for v in arr:
-        if not f(v):
-            return False
-    return True
 
 class Robot:
     def __init__(self,
@@ -76,14 +72,14 @@ class Robot:
             wp.delay(20)
         print("calibrating done")
 
-    def go(self):
+    def follow_the_line(self):
         if self.sonic_sensor.distance() <= self.avoidance_distance:
             self.stop()
             return
 
         position = self.qtr.read_line()
 
-        if all_satisfy(self.qtr.sensorValues, lambda v: v >= 1000):
+        if sum(self.qtr.sensorValues) == 5000:
             self.stop()
             return
 
@@ -164,13 +160,19 @@ if __name__ == "__main__":
               Kp=0.2,
               Kd=10)
 
+
     r.stop()
     r.calibrate()
-    # bd = BlueDot()
+    bd = BlueDot()
     # r.detect_color()
 
     while True:
-        try:
-            r.go()
-        except KeyboardInterrupt:
-            r.stop()
+        if bd.is_pressed:
+            x, y = bd.position.x, bd.position.y
+            left, right = pos_to_values(x, y)
+            r.drive(left, right)
+        else:
+            try:
+                r.follow_the_line()
+            except KeyboardInterrupt:
+                r.stop()
