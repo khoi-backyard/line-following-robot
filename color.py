@@ -31,26 +31,38 @@ while 1:
     blue_mask = cv2.inRange(hsv, low_blue, high_blue)
     blue = cv2.bitwise_and(img, img, mask=blue_mask)
 
+    yellow_contours, _ = cv2.findContours(
+        yellow_mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE
+    )
+
+    green_contours, _ = cv2.findContours(
+        green_mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE
+    )
+
+    blue_contours, _ = cv2.findContours(
+        blue_mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE
+    )
     # color: (contours, rectangle color)
     contours_dict = {
-        "yellow": (sorted(cv2.findContours(
-            yellow_mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE
-        )[0], key=cv2.contourArea)[-1:], (0, 255, 255)),
-        "green": (sorted(cv2.findContours(
-            green_mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE
-        )[0], key=cv2.contourArea)[-1:], (0, 255, 0)),
-        "blue": (sorted(cv2.findContours(
-            blue_mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE
-        )[0], key=cv2.contourArea)[-1:], (255, 0, 0)),
+        "yellow": (sorted(yellow_contours, key=cv2.contourArea), (0, 255, 255)),
+        "green": (sorted(green_contours, key=cv2.contourArea), (0, 255, 0)),
+        "blue": (sorted(blue_contours, key=cv2.contourArea), (255, 0, 0)),
     }
+
+    biggest_color = None
+    biggest_color_area = 0
 
     for color_key, (contours, rec_color) in contours_dict.items():
         print(f"{color_key} {len(contours)}")
-        for pic, contour in enumerate(contours):
+        for contour in contours:
             area = cv2.contourArea(contour)
-            if area > 300:
-                x, y, w, h = cv2.boundingRect(contour)
-                img = cv2.rectangle(img, (x, y), (x + w, y + h), rec_color, 3)
+            if area < 300: continue # skip small object
+            if area > biggest_color_area:
+                biggest_color_area = area
+                biggest_color = color_key
+            x, y, w, h = cv2.boundingRect(contour)
+            img = cv2.rectangle(img, (x, y), (x + w, y + h), rec_color, 3)
+        print(f"Biggest color {biggest_color}")
 
     window_name = "Color Tracking"
     cv2.namedWindow(window_name)  # Create a named window
