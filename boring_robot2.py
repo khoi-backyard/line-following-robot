@@ -6,6 +6,7 @@ import wiringpi as wp
 from HCSR04 import HCSR04
 from QTR5RC import QTR5RC
 from bd import BlueDot
+from time import sleep
 
 low_yellow = np.array([22, 100, 20], np.uint8)
 high_yellow = np.array([40, 255, 255], np.uint8)
@@ -51,7 +52,8 @@ class Robot:
         self.sonic_sensor = sonic_sensor
         self.avoidance_distance = avoidance_distance
 
-        print(f"kp {Kp} kd {Kd} base {base_speed} max {max_speed} distance {avoidance_distance}")
+        print(
+            f"kp {Kp} kd {Kd} base {base_speed} max {max_speed} distance {avoidance_distance}")
 
         wp.wiringPiSetup()
 
@@ -88,14 +90,18 @@ class Robot:
         motor_speed = self.Kp * error + self.Kd * (error - self.last_error)
         self.last_error = error
 
-        right_speed = clamped(self.base_speed - motor_speed, 0, self.Speed)
-        left_speed = clamped(self.base_speed + motor_speed, 0, self.Speed)
+        right_speed = int(
+            clamped(self.base_speed - motor_speed, 0, self.Speed))
+        left_speed = int(clamped(self.base_speed + motor_speed, 0, self.Speed))
         print(f"left {left_speed} right {right_speed}")
 
-        wp.softPwmWrite(self.left_motor_pins[0], int(left_speed))
-        wp.softPwmWrite(self.left_motor_pins[1], 0)
-        wp.softPwmWrite(self.right_motor_pins[0], int(right_speed))
-        wp.softPwmWrite(self.left_motor_pins[1], 0)
+        wp.softPwmWrite(self.left_motor_pins[0], left_speed)
+        wp.softPwmWrite(
+            self.left_motor_pins[1], right_speed // 2 if left_speed == 0 else 0)
+
+        wp.softPwmWrite(self.right_motor_pins[0], right_speed)
+        wp.softPwmWrite(
+            self.right_motor_pins[1], left_speed // 2 if right_speed == 0 else 0)
 
     def stop(self):
         wp.softPwmWrite(self.right_motor_pins[1], 0)
@@ -105,10 +111,20 @@ class Robot:
 
     def drive(self, left, right):
         """left, right take value from -1 1"""
-        wp.softPwmWrite(self.left_motor_pins[0], int(left * 100) if left > 0 else 0)
-        wp.softPwmWrite(self.left_motor_pins[1], -int(left * 100) if left < 0 else 0)
-        wp.softPwmWrite(self.right_motor_pins[0], int(right * 100) if right > 0 else 0)
-        wp.softPwmWrite(self.right_motor_pins[1], -int(right * 100) if right < 0 else 0)
+        wp.softPwmWrite(self.left_motor_pins[0], int(
+            left * 100) if left > 0 else 0)
+        wp.softPwmWrite(
+            self.left_motor_pins[1], -int(left * 100) if left < 0 else 0)
+        wp.softPwmWrite(self.right_motor_pins[0], int(
+            right * 100) if right > 0 else 0)
+        wp.softPwmWrite(
+            self.right_motor_pins[1], -int(right * 100) if right < 0 else 0)
+
+    def rotate_left(self, speed):
+        wp.softPwmWrite(self.left_motor_pins[0], 0)
+        wp.softPwmWrite(self.left_motor_pins[1], speed)
+        wp.softPwmWrite(self.right_motor_pins[0], speed)
+        wp.softPwmWrite(self.right_motor_pins[1], 0)
 
     def detect_color(self):
         cap = cv2.VideoCapture(0)
@@ -142,7 +158,6 @@ class Robot:
             }
 
             for color_key, contours in contours_dict.items():
-                print(type(contours))
                 for pic, contour in enumerate(contours):
                     area = cv2.contourArea(contour)
                     if area > 300:
@@ -156,15 +171,16 @@ if __name__ == "__main__":
               line_sensors=[7, 3, 2, 0, 4],
               sonic_sensor=HCSR04(echo_pin=13, trigger_pin=12),
               avoidance_distance=15,
-              base_speed=20,
-              max_speed=40,
+              base_speed=50,
+              max_speed=80,
               Kp=0.2,
               Kd=10)
 
-
     r.stop()
     r.calibrate()
-    # r.detect_color()
+
+    # while True:
+    #     r.detect_color()
 
     while True:
         if bd.is_pressed:
