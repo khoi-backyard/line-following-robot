@@ -254,7 +254,7 @@ if __name__ == "__main__":
                 state = "manual"
             elif color[0][0] == "green":
                 print("going to green")
-                r.rotate_left(33)
+                r.rotate_left(30)
                 sleep(1)
                 r.stop()
                 while r.sonic_sensor.distance() > 15:
@@ -262,7 +262,7 @@ if __name__ == "__main__":
                 state = "manual"
             elif color[0][0] == "blue":
                 print("going to blue")
-                r.rotate_right(33)
+                r.rotate_right(31)
                 sleep(1)
                 r.stop()
                 while r.sonic_sensor.distance() > 15:
