@@ -77,16 +77,7 @@ class Robot:
         print("calibrating done")
 
     def follow_the_line(self):
-        distance = self.sonic_sensor.distance()
-        if distance <= self.avoidance_distance:
-            self.stop()
-            return
-
         position = self.qtr.read_line()
-
-        if sum(self.qtr.sensorValues) == 5000:
-            self.stop()
-            return
 
         error = position - 2000
         motor_speed = self.Kp * error + self.Kd * (error - self.last_error)
@@ -125,7 +116,7 @@ class Robot:
 
     def rotate_left(self, speed):
         wp.softPwmWrite(self.left_motor_pins[0], 0)
-        wp.softPwmWrite(self.left_motor_pins[1], speed)
+        wp.softPwmWrite(self.left_motor_pins[1], 0)
         wp.softPwmWrite(self.right_motor_pins[0], speed)
         wp.softPwmWrite(self.right_motor_pins[1], 0)
 
@@ -133,7 +124,7 @@ class Robot:
         wp.softPwmWrite(self.left_motor_pins[0], speed)
         wp.softPwmWrite(self.left_motor_pins[1], 0)
         wp.softPwmWrite(self.right_motor_pins[0], 0)
-        wp.softPwmWrite(self.right_motor_pins[1], speed)
+        wp.softPwmWrite(self.right_motor_pins[1], 0)
 
     def detect_color(self):
         cap = cv2.VideoCapture(0)
@@ -176,12 +167,13 @@ class Robot:
             for color_key, contours in contours_dict.items():
                 for pic, contour in enumerate(contours):
                     area = cv2.contourArea(contour)
-                    if area < 300:
+                    if area < 10000:
                         continue  # skip small object
                     if area > biggest_color_area:
                         biggest_color_area = area
                         biggest_color = color_key
             readings.append(biggest_color)
+        print(f"biggest color {biggest_color} area {biggest_color_area}")
         c = Counter(readings)
         print(f"fread color {c} most common {c.most_common(1)}")
         return c.most_common(1)
@@ -233,10 +225,20 @@ if __name__ == "__main__":
             left, right = pos_to_values(x, y)
             r.drive(left, right)
         elif state == "line":
-            try:
-                r.follow_the_line()
-            except KeyboardInterrupt:
+            distance = r.sonic_sensor.distance()
+            print(f"distance {distance}")
+            r.follow_the_line()
+            if distance <= r.avoidance_distance:
                 r.stop()
+            elif sum(r.qtr.sensorValues) == 5000:
+                print("reached")
+                r.stop()
+                state = "color"
+            else:
+                try:
+                    r.follow_the_line()
+                except KeyboardInterrupt:
+                    r.stop()
         elif state == "color":
             print("color detecting")
             color = r.detect_color()
@@ -246,29 +248,29 @@ if __name__ == "__main__":
                 state = "manual"
             elif color[0][0] == "yellow":
                 print("going to yellow")
-                while r.sonic_sensor.distance() > 10:
-                    r.drive(0.5, 0.5)
+                while r.sonic_sensor.distance() > 15:
+                    r.drive(0.4, 0.4)
                 r.stop()
                 state = "manual"
             elif color[0][0] == "green":
                 print("going to green")
-                r.rotate_left(20)
+                r.rotate_left(33)
                 sleep(1)
                 r.stop()
-                while r.sonic_sensor.distance() > 10:
-                    r.drive(0.5, 0.5)
+                while r.sonic_sensor.distance() > 15:
+                    r.drive(0.4, 0.4)
                 state = "manual"
             elif color[0][0] == "blue":
                 print("going to blue")
-                r.rotate_right(20)
+                r.rotate_right(33)
                 sleep(1)
                 r.stop()
-                while r.sonic_sensor.distance() > 10:
-                    r.drive(0.5, 0.5)
+                while r.sonic_sensor.distance() > 15:
+                    r.drive(0.4, 0.4)
                 r.stop()
                 state = "manual"
             else:
-                print("no color switching to manual")
-                state = "manual"
+                print("no color trying again")
+
         else:
             r.stop()
