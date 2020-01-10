@@ -476,6 +476,8 @@ class BlueDot(object):
         self._print_messages = print_messages
 
         self._is_pressed = False
+        self._is_auto_pressed = False
+        self._is_manual_pressed = False
 
         self._is_connected_event = Event()
         self._is_pressed_event = Event()
@@ -591,6 +593,15 @@ class BlueDot(object):
         Returns ``True`` if the Blue Dot is pressed (or held).
         """
         return self._is_pressed
+
+    @property
+    def is_manual_pressed(self):
+        return self._is_manual_pressed
+
+
+    @property
+    def is_auto_pressed(self):
+        return self._is_auto_pressed
 
     @property
     def value(self):
@@ -1215,6 +1226,7 @@ class BlueDot(object):
 
 
     def _auto_pressed(self):
+        self._is_auto_pressed = True
         self._is_auto_pressed_event.set()
         self._is_auto_pressed_event.clear()
 
@@ -1222,6 +1234,7 @@ class BlueDot(object):
 
 
     def _manual_pressed(self):
+        self._is_manual_pressed = True
         self._is_manual_pressed_event.set()
         self._is_manual_pressed_event.clear()
 

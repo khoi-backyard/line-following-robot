@@ -1,12 +1,14 @@
 import cv2
 import numpy as np
 import wiringpi as wp
+import os
 
 # Class Robot.
 from HCSR04 import HCSR04
 from QTR5RC import QTR5RC
 from bd import BlueDot
 from time import sleep
+from collections import Counter
 
 low_yellow = np.array([22, 100, 20], np.uint8)
 high_yellow = np.array([40, 255, 255], np.uint8)
@@ -69,13 +71,14 @@ class Robot:
 
     def calibrate(self):
         print("Calibrating")
-        for i in range(0, 100):
+        for _ in range(0, 100):
             self.qtr.calibrate_sensors()
             wp.delay(20)
         print("calibrating done")
 
     def follow_the_line(self):
-        if self.sonic_sensor.distance() <= self.avoidance_distance:
+        distance = self.sonic_sensor.distance()
+        if distance <= self.avoidance_distance:
             self.stop()
             return
 
@@ -85,7 +88,6 @@ class Robot:
             self.stop()
             return
 
-        print(f"position {position}")
         error = position - 2000
         motor_speed = self.Kp * error + self.Kd * (error - self.last_error)
         self.last_error = error
@@ -93,15 +95,16 @@ class Robot:
         right_speed = int(
             clamped(self.base_speed - motor_speed, 0, self.Speed))
         left_speed = int(clamped(self.base_speed + motor_speed, 0, self.Speed))
-        print(f"left {left_speed} right {right_speed}")
+        print(
+            f"position {position} left {left_speed} right {right_speed} distance {distance}")
 
         wp.softPwmWrite(self.left_motor_pins[0], left_speed)
         wp.softPwmWrite(
-            self.left_motor_pins[1], right_speed // 2 if left_speed == 0 else 0)
+            self.left_motor_pins[1], right_speed // 3 if left_speed == 0 else 0)
 
         wp.softPwmWrite(self.right_motor_pins[0], right_speed)
         wp.softPwmWrite(
-            self.right_motor_pins[1], left_speed // 2 if right_speed == 0 else 0)
+            self.right_motor_pins[1], left_speed // 3 if right_speed == 0 else 0)
 
     def stop(self):
         wp.softPwmWrite(self.right_motor_pins[1], 0)
@@ -126,10 +129,20 @@ class Robot:
         wp.softPwmWrite(self.right_motor_pins[0], speed)
         wp.softPwmWrite(self.right_motor_pins[1], 0)
 
+    def rotate_right(self, speed):
+        wp.softPwmWrite(self.left_motor_pins[0], speed)
+        wp.softPwmWrite(self.left_motor_pins[1], 0)
+        wp.softPwmWrite(self.right_motor_pins[0], 0)
+        wp.softPwmWrite(self.right_motor_pins[1], speed)
+
     def detect_color(self):
         cap = cv2.VideoCapture(0)
+        for _ in range(0, 50):  # warming up the camera, discard couple first frames
+            _, img = cap.read()
 
-        while 1:
+        readings = []
+
+        for _ in range(0, 20):  # take 20 readings
             _, img = cap.read()
 
             # converting frame(img) from BGR (Blue-Green-Red) to HSV (hue-saturation-value)
@@ -157,15 +170,50 @@ class Robot:
                 )[0]),
             }
 
+            biggest_color = None
+            biggest_color_area = 0
+
             for color_key, contours in contours_dict.items():
                 for pic, contour in enumerate(contours):
                     area = cv2.contourArea(contour)
-                    if area > 300:
-                        print(f"{color_key} {len(contours)}")
+                    if area < 300:
+                        continue  # skip small object
+                    if area > biggest_color_area:
+                        biggest_color_area = area
+                        biggest_color = color_key
+            readings.append(biggest_color)
+        c = Counter(readings)
+        print(f"fread color {c} most common {c.most_common(1)}")
+        return c.most_common(1)
 
+
+state = "manual"  # start out as manual
+
+
+def switch_to_manual():
+    global state
+    print("Switching to manual")
+    state = "manual"
+
+
+def switch_to_line():
+    global state
+    print("Switching to line")
+    state = "line"
+
+
+def switch_to_color():
+    global state
+    print("Switching to color")
+    state = "color"
+
+
+bd = BlueDot()
+bd.when_manual_pressed = switch_to_color
+bd.when_auto_pressed = switch_to_line
+bd.when_pressed = switch_to_manual
 
 if __name__ == "__main__":
-    bd = BlueDot()
     r = Robot(left_motor_pins=(23, 24),
               right_motor_pins=(26, 1),
               line_sensors=[7, 3, 2, 0, 4],
@@ -179,16 +227,48 @@ if __name__ == "__main__":
     r.stop()
     r.calibrate()
 
-    # while True:
-    #     r.detect_color()
-
     while True:
-        if bd.is_pressed:
+        if state == "manual" and bd.is_pressed:
             x, y = bd.position.x, bd.position.y
             left, right = pos_to_values(x, y)
             r.drive(left, right)
-        else:
+        elif state == "line":
             try:
                 r.follow_the_line()
             except KeyboardInterrupt:
                 r.stop()
+        elif state == "color":
+            print("color detecting")
+            color = r.detect_color()
+            print(f"color detected {color}")
+            if len(color) == 0:
+                print("no color detected")
+                state = "manual"
+            elif color[0][0] == "yellow":
+                print("going to yellow")
+                while r.sonic_sensor.distance() > 10:
+                    r.drive(0.5, 0.5)
+                r.stop()
+                state = "manual"
+            elif color[0][0] == "green":
+                print("going to green")
+                r.rotate_left(20)
+                sleep(1)
+                r.stop()
+                while r.sonic_sensor.distance() > 10:
+                    r.drive(0.5, 0.5)
+                state = "manual"
+            elif color[0][0] == "blue":
+                print("going to blue")
+                r.rotate_right(20)
+                sleep(1)
+                r.stop()
+                while r.sonic_sensor.distance() > 10:
+                    r.drive(0.5, 0.5)
+                r.stop()
+                state = "manual"
+            else:
+                print("no color switching to manual")
+                state = "manual"
+        else:
+            r.stop()

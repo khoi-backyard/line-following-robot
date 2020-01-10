@@ -3,8 +3,12 @@ import os
 
 import cv2
 import numpy as np
+import time
 
 cap = cv2.VideoCapture(0)
+_, img = cap.read()
+
+_, img = cap.read()
 
 low_yellow = np.array([22, 100, 20], np.uint8)
 high_yellow = np.array([40, 255, 255], np.uint8)
@@ -53,16 +57,16 @@ while 1:
     biggest_color_area = 0
 
     for color_key, (contours, rec_color) in contours_dict.items():
-        print(f"{color_key} {len(contours)}")
         for contour in contours:
             area = cv2.contourArea(contour)
-            if area < 300: continue # skip small object
+            if area < 300:
+                continue  # skip small object
             if area > biggest_color_area:
                 biggest_color_area = area
                 biggest_color = color_key
-            x, y, w, h = cv2.boundingRect(contour)
-            img = cv2.rectangle(img, (x, y), (x + w, y + h), rec_color, 3)
-        print(f"Biggest color {biggest_color}")
+                x, y, w, h = cv2.boundingRect(contour)
+                img = cv2.rectangle(img, (x, y), (x + w, y + h), rec_color, 3)
+        print(f"Biggest color {biggest_color} with area {biggest_color_area}")
 
     window_name = "Color Tracking"
     cv2.namedWindow(window_name)  # Create a named window
